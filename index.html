@@ -1,1 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment QR Identifier & Messenger</title>
+    <!-- Include HTML5-QRCode scanning library via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --background: #f8fafc;
+            --card: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background);
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h2 { margin-bottom: 5px; color: #0f172a; }
+        .subtitle { color: #64748b; margin-bottom: 20px; font-size: 14px; text-align: center; }
+        #reader {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: none !important;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .result-card {
+            display: none;
+            width: 100%;
+            max-width: 368px;
+            background: var(--card);
+            padding: 16px;
+            border-radius: 16px;
+            margin-top: 20px;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .result-row { margin-bottom: 12px; }
+        .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .value { font-size: 18px; font-weight: 600; color: #334155; }
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.2s;
+            text-decoration: none;
+        }
+        .btn:active { background-color: #1d4ed8; }
+    </style>
+</head>
+<body>
+
+    <h2>QR Messenger</h2>
+    <div class="subtitle">Scan any UPI / Payment QR code to extract the number</div>
+
+    <!-- Scanner Camera Viewport -->
+    <div id="reader"></div>
+
+    <!-- Slide-up Result UI Card -->
+    <div id="resultCard" class="result-card">
+        <div class="result-row">
+            <div class="label">Merchant / Payee Name</div>
+            <div id="displayName" class="value">Detecting...</div>
+        </div>
+        <div class="result-row">
+            <div class="label">Identified Payment Number/ID</div>
+            <div id="displayNumber" class="value">Detecting...</div>
+        </div>
+        <a id="msgBtn" class="btn" href="#" target="_blank">Send Message via SMS</a>
+    </div>
+
+    <script>
+        // Extraction Logic Function
+        function parsePaymentQR(decodedText) {
+            try {
+                // Example URI: upi://pay?pa=9876543210@ybl&pn=TanishStore&cu=INR
+                const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+                
+                let paymentAddress = urlParams.get('pa') || ""; // e.g. 9876543210@ybl
+                let payeeName = urlParams.get('pn') || "Unknown Merchant";
+                
+                // Decode URL encoded characters (like %20 to spaces)
+                payeeName = decodeURIComponent(payeeName);
+
+                // Use Regex to isolate just the phone number/username before the '@' sign
+                let identifiedNumber = paymentAddress.split('@')[0];
+
+                if (identifiedNumber) {
+                    displayResult(payeeName, identifiedNumber);
+                } else {
+                    alert("Scanned QR is not a standard payment phone number format.");
+                }
+            } catch (e) {
+                console.error("Parsing error: ", e);
+                alert("Could not extract payment data. Please scan a valid UPI/Payment QR.");
+            }
+        }
+
+        // Frontend UI Update Function
+        function displayResult(name, number) {
+            document.getElementById('displayName').innerText = name;
+            document.getElementById('displayNumber').innerText = number;
+            
+            // Generate deep-link to trigger native phone messaging app
+            const messageButton = document.getElementById('msgBtn');
+            messageButton.href = `sms:${number}?body=Hello ${encodeURIComponent(name)}, I found your number via your payment QR code.`;
+            
+            // Show the result panel
+            document.getElementById('resultCard').style.display = 'block';
+            
+            // Give subtle haptic feedback if supported by the Android browser
+            if (navigator.vibrate) navigator.vibrate(100);
+        }
+
+        // Initialize the Scanning Camera Interface
+        function onScanSuccess(decodedText, decodedResult) {
+            // Stop scanning once code is found to save battery and freeze frame
+            html5QrcodeScanner.clear();
+            
+            // Pass the raw text payload to our processing logic
+            parsePaymentQR(decodedText);
+        }
+
+        function onScanFailure(error) {
+            // Quietly handle frame tracking failures (normal behavior while searching)
+        }
+
+        // Configure the camera layout settings
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", 
+            { 
+                fps: 15, 
+                qrbox: { width: 250, height: 250 },
+                rememberLastUsedCamera: true,
+                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+            },
+            /* verbose= */ false
+        );
+        
+        // Start live rendering
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    </script>
+</body>
+</html>
 
